@@ -120,7 +120,7 @@ export async function login(page) {
   log(`   at URL: ${page.url()}`);
   await screenshot(page, 'login-page');
 
-  // If the session is actually still valid, Naukri bounces /nlogin/login to a
+  // If the session is actually still valid, Naukri bounces /login to a
   // logged-in page. Detect that instead of waiting 20s for a password field
   // that will never render here.
   if (/mnjuser|homepage|myprofile/i.test(page.url())) {
