@@ -1,15 +1,15 @@
 name: Naukri daily
 
-# Runs four times daily: 05:00, 08:00, 13:00, and 15:00 IST.
+# Runs four times daily: 05:30, 09:30, 12:30, and 15:30 IST.
 # GitHub cron is UTC-only, and scheduled runs can be delayed a bit under load,
 # IST is UTC+05:30, so these UTC cron times map to the requested IST times.
 # You can also trigger it by hand from the Actions tab (workflow_dispatch).
 on:
   schedule:
-    - cron: '30 23 * * *'
-    - cron: '30 2 * * *'
-    - cron: '30 7 * * *'
-    - cron: '30 9 * * *'
+    - cron: '0 0 * * *'
+    - cron: '0 4 * * *'
+    - cron: '0 7 * * *'
+    - cron: '0 10 * * *'
   workflow_dispatch: {}
 
 # Never let two daily runs overlap (they'd fight over the shared session).
