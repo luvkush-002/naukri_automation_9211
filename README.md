@@ -138,9 +138,10 @@ Edit `.env`:
 ## Scheduling — four times daily via GitHub Actions
 
 The repo ships a workflow at `.github/workflows/daily.yml` that runs
-`node run.js` (resume update + auto-apply) every day at **05:00, 08:00, 13:00,
-and 15:00 IST**. GitHub cron is UTC-only; the corresponding schedules are
-`'30 23 * * *'`, `'30 2 * * *'`, `'30 7 * * *'`, and `'30 9 * * *'`.
+`node run.js` (resume update + auto-apply) every day at **04:30, 08:30, 11:30,
+and 14:30 IST**. GitHub cron is UTC-only; the corresponding schedules are
+`'0 23 * * *'`, `'0 3 * * *'`, `'0 6 * * *'`, and `'0 9 * * *'`. These start
+one hour before the previous scheduled times.
 You can also trigger it by hand from the repo's **Actions** tab ("Run workflow").
 
 ### ⚠️ Read this first — the headless caveat
