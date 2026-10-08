@@ -64,15 +64,26 @@ that control and you start seeing `no-file-input`, open your profile, Inspect th
 After the search-based apply flow, the daily run opens the homepage, clicks
 **View all** on the "Jobs based on your profile / applies" widget, and lands on
 Naukri's **Recommended jobs** page. It then walks the tabs one by one —
-**Profile → Applies → Preferences → You might like** — and applies to every job
-on each tab (same apply logic as the search flow: one-click applies, chatbot
+**Profile → Applies → Preferences → You might like** — and applies to the
+relevant jobs on each tab (same apply logic as the search flow: one-click applies, chatbot
 handling per `SKIP_CHATBOT`, external-site jobs skipped per `SKIP_EXTERNAL`).
 
 - Jobs that appear in several tabs are only tried once; everything handled is
   recorded in `applied.json`, so re-runs skip it.
-- By default **every** recommended job is applied to. Set
-  `RECOMMENDED_FILTER=true` to only apply to jobs that pass the search flow's
-  role-title + `MIN/MAX_EXPERIENCE` filter.
+- By default (`RECOMMENDED_FILTER=true`) a job is applied to only if it passes
+  all three checks:
+  - **Role**: the title matches the search flow's allowed roles (Java developer,
+    software engineer, …) and isn't excluded (senior/lead/manager, .NET, PHP,
+    sales, testing, …).
+  - **Skills**: at least `MIN_SKILL_MATCH` (default 1) of `SKILLS` (defaults to
+    `KEYWORDS`) appear on the card. If the card doesn't show them, the job page's
+    description and key skills are checked before applying.
+  - **Experience**: the job's band overlaps `MIN_EXPERIENCE`–`MAX_EXPERIENCE`
+    (read from the job page if the card doesn't show it; jobs with no
+    experience range are skipped).
+
+  Jobs rejected on the job page are recorded in `applied.json` so they aren't
+  reopened. Set `RECOMMENDED_FILTER=false` to apply to every recommended job.
 - `RECOMMENDED_MAX_PER_TAB` (default 25, `0` = no cap) limits apply attempts per
   tab per run. Naukri also enforces its own daily apply limit.
 - Turn the step off with `RECOMMENDED=false`.
@@ -105,19 +116,34 @@ Thresholds are configurable via `EARLY_ACCESS_MIN_SALARY_LOWER` /
 ## Chatbot auto-answer
 
 When `SKIP_CHATBOT=false`, `handleChatbot()` in `apply.js` reads each bot question,
-matches it against a rule set (`CHATBOT_RULES`) covering notice period, CTC,
-current/preferred location, relocation, F2F availability, designation,
-education, and "experience in `<skill>`" questions, then answers from the
-matching `.env` field (e.g. `NOTICE_PERIOD`, `CURRENT_CTC`, `WILLING_TO_RELOCATE`).
-Skill-experience questions default to `DEFAULT_SKILL_EXPERIENCE_YEARS` (2 by
-default) unless overridden per-skill via `SKILL_EXPERIENCE_OVERRIDES` (JSON,
-e.g. `{"java":"4","aws":"1"}`).
+matches it against a rule set (`CHATBOT_RULES`) and answers from `.env`:
 
-If a question doesn't match any rule, it is **never guessed** — the job is
+| Question about | Answer |
+|---|---|
+| Experience in a skill | `DEFAULT_SKILL_EXPERIENCE_YEARS` (2) if the skill is in `SKILLS` / `KEYWORDS` (or `SKILL_EXPERIENCE_OVERRIDES`, which sets a per-skill value), else `0`. Yes/No chips → Yes / No. No skill named → `TOTAL_EXPERIENCE_YEARS`. |
+| Relocation | `Yes` if the job location (or the city in the question) is in `PREFERRED_LOCATIONS` (falls back to `LOCATIONS`), else `No`. |
+| Face-to-face / offline / walk-in interview | `Yes` if the job location is `CURRENT_LOCATION`, else `No`. |
+| Current CTC | `CURRENT_CTC` (text form); if the field rejects text or wants digits/rupees → `CURRENT_CTC_NUMBER`; "in lakhs" questions and salary chips → lakh value. |
+| Expected CTC | `EXPECTED_CTC` (text form); if the field needs a number → `EXPECTED_CTC_NUMBER`; lakh questions use its lakh value. |
+| Notice period, current/preferred location, designation, education | the matching `.env` field. |
+
+City names are compared with aliases (Bengaluru = Bangalore, Gurgaon = Gurugram, Bombay = Mumbai).
+
+Every question the chatbot asks and every answer given is logged:
+
+- **Console**: `💬 Q1: "<question>"  [options]` followed by `A: "<answer>"  (rule: <name>)`.
+- **`chatbot-qa.log`**: plain text, one block per job (title, company, location,
+  URL, each Q with its options and answer, any rejected answer that was retried,
+  and the final outcome). Easiest file to skim after a run.
+- **`chatbot-log.json`**: the same data as JSON.
+
+Both are included in the GitHub Actions run artifacts.
+
+If a question doesn't match any rule, it is **never guessed**: the job is
 marked `skipped` with reason `chatbot-unmatched: <question text>`, a
-screenshot is saved, and every Q&A pair (matched or not) is appended to
-`chatbot-log.json` for review. Add a new entry to `CHATBOT_RULES` in
-`apply.js` to handle recurring unmatched questions.
+screenshot is saved, the question is logged with `A: (no answer — no matching rule)`,
+and it's added to `chatbot-answers.json`. Fill in its `answer` there, or add a
+rule to `CHATBOT_RULES` in `apply.js`.
 
 ## Tuning
 

@@ -7,4 +7,5 @@ results.json
 screenshots/
 storage-state.json
 chatbot-log.json
+chatbot-qa.log
 chatbot-answers.json

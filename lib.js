@@ -54,10 +54,14 @@ export const cfg = {
   eaMaxInterests: parseInt(process.env.EARLY_ACCESS_MAX_INTERESTS || '50', 10),
   // --- Recommended jobs flow (homepage "View all" -> each tab) ---
   // Applies to jobs on every recommended-jobs tab (Profile, Applies,
-  // Preferences, You might like). By default applies to all of them; set
-  // RECOMMENDED_FILTER=true to reuse the search flow's role/experience filter.
+  // Preferences, You might like). By default only jobs that match your role
+  // titles, at least MIN_SKILL_MATCH of SKILLS, and [minExp, maxExp] are
+  // applied to; RECOMMENDED_FILTER=false applies to everything.
   recommended: (process.env.RECOMMENDED || 'true') === 'true',
-  recommendedFilter: (process.env.RECOMMENDED_FILTER || 'false') === 'true',
+  recommendedFilter: (process.env.RECOMMENDED_FILTER || 'true') === 'true',
+  // Skills a recommended job must mention (card or job page). Defaults to KEYWORDS.
+  skills: (process.env.SKILLS || process.env.KEYWORDS || '').split(',').map(s => s.trim()).filter(Boolean),
+  minSkillMatch: parseInt(process.env.MIN_SKILL_MATCH || '1', 10),
   // Per-tab cap on apply attempts in one run (0 = no cap).
   recommendedMaxPerTab: parseInt(process.env.RECOMMENDED_MAX_PER_TAB || '25', 10),
   // Static profile used to auto-answer Naukri's post-apply chatbot questions
@@ -66,12 +70,14 @@ export const cfg = {
   profile: {
     totalExperienceYears: process.env.TOTAL_EXPERIENCE_YEARS || '',
     noticePeriod: process.env.NOTICE_PERIOD || '',
+    // Text form typed first (e.g. "8 LPA"); the *_NUMBER form (rupees) is used
+    // when the field wants digits, and its lakh value for chips/"in lakhs".
     currentCtc: process.env.CURRENT_CTC || '',
+    currentCtcNumber: process.env.CURRENT_CTC_NUMBER || '',
     expectedCtc: process.env.EXPECTED_CTC || '',
+    expectedCtcNumber: process.env.EXPECTED_CTC_NUMBER || '',
     currentLocation: process.env.CURRENT_LOCATION || '',
     preferredLocations: process.env.PREFERRED_LOCATIONS || '',
-    willingToRelocate: process.env.WILLING_TO_RELOCATE || 'Yes',
-    availableForF2F: process.env.AVAILABLE_FOR_F2F || 'Yes',
     currentDesignation: process.env.CURRENT_DESIGNATION || '',
     highestEducation: process.env.HIGHEST_EDUCATION || '',
     noticeNegotiable: process.env.NOTICE_NEGOTIABLE || 'No',

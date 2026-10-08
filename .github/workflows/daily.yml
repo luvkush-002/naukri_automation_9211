@@ -112,17 +112,19 @@ jobs:
           # --- Recommended jobs (homepage "View all" -> every tab) ---
           RECOMMENDED: ${{ vars.RECOMMENDED }}
           RECOMMENDED_FILTER: ${{ vars.RECOMMENDED_FILTER }}
+          SKILLS: ${{ vars.SKILLS }}
+          MIN_SKILL_MATCH: ${{ vars.MIN_SKILL_MATCH }}
           RECOMMENDED_MAX_PER_TAB: ${{ vars.RECOMMENDED_MAX_PER_TAB }}
           # --- Chatbot profile (only used when SKIP_CHATBOT=false) ---
           TOTAL_EXPERIENCE_YEARS: ${{ vars.TOTAL_EXPERIENCE_YEARS }}
           NOTICE_PERIOD: ${{ vars.NOTICE_PERIOD }}
           NOTICE_NEGOTIABLE: ${{ vars.NOTICE_NEGOTIABLE }}
           CURRENT_CTC: ${{ vars.CURRENT_CTC }}
+          CURRENT_CTC_NUMBER: ${{ vars.CURRENT_CTC_NUMBER }}
           EXPECTED_CTC: ${{ vars.EXPECTED_CTC }}
+          EXPECTED_CTC_NUMBER: ${{ vars.EXPECTED_CTC_NUMBER }}
           CURRENT_LOCATION: ${{ vars.CURRENT_LOCATION }}
           PREFERRED_LOCATIONS: ${{ vars.PREFERRED_LOCATIONS }}
-          WILLING_TO_RELOCATE: ${{ vars.WILLING_TO_RELOCATE }}
-          AVAILABLE_FOR_F2F: ${{ vars.AVAILABLE_FOR_F2F }}
           CURRENT_DESIGNATION: ${{ vars.CURRENT_DESIGNATION }}
           HIGHEST_EDUCATION: ${{ vars.HIGHEST_EDUCATION }}
           DEFAULT_SKILL_EXPERIENCE_YEARS: ${{ vars.DEFAULT_SKILL_EXPERIENCE_YEARS }}
@@ -141,6 +143,7 @@ jobs:
             results.csv
             results.json
             chatbot-log.json
+            chatbot-qa.log
             chatbot-answers.json
           if-no-files-found: ignore
           retention-days: 7

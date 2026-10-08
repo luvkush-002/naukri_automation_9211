@@ -12,7 +12,7 @@ import {
 } from './lib.js';
 import {
   applyToJob, loadApplied, saveApplied, appendResult,
-  titleIsRelevant, extractExperienceRange, experienceMatches,
+  titleIsRelevant, extractExperienceRange, experienceMatches, matchedSkills,
 } from './apply.js';
 
 const RECOMMENDED_URL = 'https://www.naukri.com/mnjuser/recommendedjobs';
@@ -94,10 +94,52 @@ async function openCardJob(page, context, jobId) {
   return popup;
 }
 
+// ---------- Relevance filter: role + skills + experience ----------
+// Card-level check. Returns { ok:false, reason } for a definite reject, or
+// { ok:true, needsPage } where needsPage lists checks the card couldn't
+// settle (skills not shown on the card, experience band not parsed) and that
+// must be confirmed on the job detail page before applying.
+function checkCard(card) {
+  if (!titleIsRelevant(card.title, card.cardText)) return { ok: false, reason: 'role/title not in profile' };
+  const needsPage = [];
+  const exp = extractExperienceRange(card.cardText);
+  if (!exp) needsPage.push('experience');
+  else if (!experienceMatches(exp)) return { ok: false, reason: `experience ${exp.min}-${exp.max} yrs outside ${cfg.minExp}-${cfg.maxExp}` };
+  if (matchedSkills(`${card.title} ${card.cardText}`).length < cfg.minSkillMatch) needsPage.push('skills');
+  return { ok: true, needsPage };
+}
+
+// Job-page check for whatever checkCard couldn't settle. Reads only the job
+// header + description + key skills, not the "similar jobs" sidebar, which
+// would otherwise match skills from unrelated postings.
+async function checkJobPage(jobPage, needsPage) {
+  await jobPage.locator('[class*="job-desc"], [class*="key-skill"], [class*="jd-header"]').first()
+    .waitFor({ timeout: 10000 }).catch(() => {});
+  const parts = await jobPage.locator(
+    '[class*="jd-header"], [class*="job-header"], [class*="job-desc"], [class*="key-skill"]'
+  ).allInnerTexts().catch(() => []);
+  const text = parts.join(' \n ');
+  if (!text.trim()) return { ok: false, reason: 'job page details not found' };
+  if (needsPage.includes('experience')) {
+    const exp = extractExperienceRange(text);
+    if (!exp) return { ok: false, reason: 'experience range not found' };
+    if (!experienceMatches(exp)) return { ok: false, reason: `experience ${exp.min}-${exp.max} yrs outside ${cfg.minExp}-${cfg.maxExp}` };
+  }
+  if (needsPage.includes('skills')) {
+    const found = matchedSkills(text);
+    if (found.length < cfg.minSkillMatch) {
+      return { ok: false, reason: `skills matched ${found.length}/${cfg.minSkillMatch} (${found.join(', ') || 'none'})` };
+    }
+  }
+  return { ok: true };
+}
+
 // ---------- Recommended-jobs run ----------
 export async function runRecommended(context, page) {
   log('\n🎯 Recommended jobs — apply across all tabs');
-  log(`   filter:      ${cfg.recommendedFilter ? 'role + experience (same as search flow)' : 'none (apply to all)'}`);
+  log(`   filter:      ${cfg.recommendedFilter
+    ? `role title + >=${cfg.minSkillMatch} skill(s) of [${cfg.skills.join(', ')}] + ${cfg.minExp}-${cfg.maxExp} yrs`
+    : 'none (apply to all)'}`);
   log(`   cap per tab: ${cfg.recommendedMaxPerTab || 'none'}`);
   log(`   dry-run:     ${cfg.dryRun}`);
 
@@ -129,26 +171,40 @@ export async function runRecommended(context, page) {
       seenThisRun.add(card.id);
       stats.seen++;
 
+      let needsPage = [];
       if (cfg.recommendedFilter) {
-        const expRange = extractExperienceRange(card.cardText);
-        if (!titleIsRelevant(card.title, card.cardText) || !experienceMatches(expRange)) {
-          log(`   ⏭️  filtered out: "${card.title}"`);
+        const c = checkCard(card);
+        if (!c.ok) {
+          log(`   🚫 filtered out: "${card.title}" — ${c.reason}`);
           stats.irrelevant++;
           continue;
         }
+        needsPage = c.needsPage;
       }
 
       const label = `${card.title.slice(0, 55).padEnd(55)}  @  ${(card.company || '?').slice(0, 30)}`;
       log(`  → ${label}`);
-      attempts++;
 
       let r;
       try {
         const jobPage = await openCardJob(page, context, card.id);
+        const pageCheck = jobPage && needsPage.length ? await checkJobPage(jobPage, needsPage) : { ok: true };
         if (!jobPage) {
+          attempts++;
           r = { ...card, url: '', status: 'error', reason: 'card-did-not-open-job-page' };
           await screenshot(page, `recommended-noopen-${card.id}`);
+        } else if (!pageCheck.ok) {
+          // Remember it so later runs don't reopen the same irrelevant job.
+          log(`     🚫 filtered out on job page — ${pageCheck.reason}`);
+          await jobPage.close().catch(() => {});
+          stats.irrelevant++;
+          applied.add(card.id);
+          if (!cfg.dryRun) saveApplied(applied);
+          await page.bringToFront().catch(() => {});
+          await jitter(1500, 3000);
+          continue;
         } else {
+          attempts++;
           r = await applyToJob(context, { id: card.id, url: jobPage.url(), title: card.title, company: card.company }, jobPage);
         }
       } catch (e) {
